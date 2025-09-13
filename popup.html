@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 300px;
+      padding: 20px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      margin: 0;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    .header h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+    
+    .settings-section {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 15px;
+      backdrop-filter: blur(10px);
+    }
+    
+    .setting-group {
+      margin-bottom: 15px;
+    }
+    
+    .setting-group:last-child {
+      margin-bottom: 0;
+    }
+    
+    .setting-label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      font-size: 14px;
+    }
+    
+    .radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .radio-option {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 6px;
+      transition: background-color 0.2s;
+    }
+    
+    .radio-option:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    
+    .radio-option input[type="radio"] {
+      margin-right: 10px;
+      accent-color: #4CAF50;
+    }
+    
+    .api-key-input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      font-size: 12px;
+      box-sizing: border-box;
+    }
+    
+    .api-key-input::placeholder {
+      color: rgba(255, 255, 255, 0.7);
+    }
+    
+    .status {
+      text-align: center;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+    
+    .status.success {
+      background: rgba(76, 175, 80, 0.2);
+      border: 1px solid rgba(76, 175, 80, 0.5);
+    }
+    
+    .status.error {
+      background: rgba(244, 67, 54, 0.2);
+      border: 1px solid rgba(244, 67, 54, 0.5);
+    }
+    
+    .help-text {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.8);
+      margin-top: 5px;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🏨 Hotel Rating Fetcher</h1>
+  </div>
+  
+  <div class="settings-section">
+    <div class="setting-group">
+      <label class="setting-label">Mode:</label>
+      <div class="radio-group">
+        <label class="radio-option">
+          <input type="radio" name="mode" value="off">
+          <span>Off - Disabled</span>
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="mode" value="onclick">
+          <span>On Click - Manual trigger</span>
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="mode" value="continuous">
+          <span>Continuous - Auto detect</span>
+        </label>
+      </div>
+    </div>
+    
+    <div class="setting-group">
+      <label class="setting-label">Gemini API Key:</label>
+      <input type="password" id="apiKey" class="api-key-input" placeholder="Enter your Gemini API key">
+      <div class="help-text">
+        Your API key is stored locally and never shared. Get your key from Google AI Studio.
+      </div>
+    </div>
+  </div>
+  
+  <div id="status" class="status" style="display: none;"></div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Hotel Rating Fetcher",
+  "version": "1.0",
+  "description": "Fetch Google ratings for hotels on OTT websites using Gemini API",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Hotel Rating Fetcher"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["rating-widget.html", "styles.css"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

@@ -1,0 +1,243 @@
+/* Hotel Rating Widget Styles */
+.hotel-rating-widget {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 400px;
+  max-width: 90vw;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  z-index: 10000;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: white;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.hotel-rating-widget .header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 15px 15px 0 0;
+}
+
+.hotel-rating-widget .header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+}
+
+.hotel-rating-widget .close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.hotel-rating-widget .close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.hotel-rating-widget .rating-content {
+  padding: 20px;
+}
+
+.hotel-rating-widget .rating-info {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.hotel-rating-widget .rating-score {
+  text-align: center;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
+}
+
+.hotel-rating-widget .rating-number {
+  font-size: 48px;
+  font-weight: bold;
+  display: block;
+  margin-bottom: 10px;
+  color: #FFD700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.hotel-rating-widget .rating-stars {
+  font-size: 24px;
+  color: #FFD700;
+  margin-bottom: 10px;
+  display: block;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.hotel-rating-widget .rating-count {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+}
+
+.hotel-rating-widget .recent-reviews h4 {
+  margin: 0 0 15px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+}
+
+.hotel-rating-widget .reviews-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.hotel-rating-widget .review-item {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 15px;
+  border-radius: 10px;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hotel-rating-widget .review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.hotel-rating-widget .reviewer-name {
+  font-weight: 600;
+  color: white;
+  font-size: 14px;
+}
+
+.hotel-rating-widget .review-rating {
+  color: #FFD700;
+  font-size: 14px;
+}
+
+.hotel-rating-widget .review-date {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.hotel-rating-widget .review-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.9);
+  font-style: italic;
+}
+
+/* Loading Widget Styles */
+.hotel-rating-widget .loading-content {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.hotel-rating-widget .spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top: 4px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.hotel-rating-widget .loading-content p {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Error Widget Styles */
+.hotel-rating-widget .error-content {
+  padding: 20px;
+}
+
+.hotel-rating-widget .error-content p {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.4;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .hotel-rating-widget {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+    max-width: none;
+  }
+  
+  .hotel-rating-widget .rating-number {
+    font-size: 36px;
+  }
+  
+  .hotel-rating-widget .rating-stars {
+    font-size: 20px;
+  }
+  
+  .hotel-rating-widget .reviews-list {
+    max-height: 200px;
+  }
+}
+
+/* Scrollbar Styling */
+.hotel-rating-widget .reviews-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.hotel-rating-widget .reviews-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.hotel-rating-widget .reviews-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.hotel-rating-widget .reviews-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
