@@ -1,7 +1,7 @@
 // Hotel Rating Fetcher Background Script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'fetchHotelRating') {
-    fetchHotelRating(request.hotelName)
+    fetchHotelRating(request.hotelName, request.location, request.excludeSources || [])
       .then(data => {
         sendResponse({ success: true, data });
       })
@@ -15,21 +15,35 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-async function fetchHotelRating(hotelName) {
+async function fetchHotelRating(hotelName, location = null, excludeSources = []) {
   try {
     // Get API key from storage
     const result = await chrome.storage.sync.get(['geminiApiKey']);
     const apiKey = result.geminiApiKey;
     
-    if (!apiKey) {
-      throw new Error('Gemini API key not found. Please configure it in the extension popup.');
+    if (!apiKey || apiKey.trim() === '') {
+      throw new Error('Gemini API key not configured. Please open the extension popup and enter your API key in the settings.');
     }
 
     // Create the prompt for Gemini
-    const prompt = createGeminiPrompt(hotelName);
+    const prompt = createGeminiPrompt(hotelName, location, excludeSources);
     
-    // Call Gemini API
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+    // Call Gemini API - try different models/versions
+    // Using gemini-2.0-flash as primary (known to work)
+    const modelsToTry = [
+      { version: 'v1beta', model: 'gemini-2.0-flash' },
+      { version: 'v1', model: 'gemini-pro' },
+      { version: 'v1beta', model: 'gemini-1.5-pro' },
+      { version: 'v1beta', model: 'gemini-1.5-flash' }
+    ];
+    
+    let response;
+    let lastError;
+    
+    for (const { version, model } of modelsToTry) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent?key=${apiKey}`;
+        response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -44,14 +58,28 @@ async function fetchHotelRating(hotelName) {
           temperature: 0.1,
           topK: 32,
           topP: 1,
-          maxOutputTokens: 2048,
+              maxOutputTokens: 4096,
         }
       })
     });
 
-    if (!response.ok) {
+        if (response.ok) {
+          console.log(`Successfully using model: ${model} (${version})`);
+          break; // Success, exit loop
+        } else {
       const errorData = await response.json();
-      throw new Error(`API Error: ${errorData.error?.message || 'Unknown error'}`);
+          lastError = errorData.error?.message || 'Unknown error';
+          console.log(`Model ${model} (${version}) failed: ${lastError}`);
+        }
+      } catch (error) {
+        lastError = error.message;
+        console.log(`Model ${model} (${version}) error: ${lastError}`);
+        continue; // Try next model
+      }
+    }
+    
+    if (!response || !response.ok) {
+      throw new Error(`API Error: All models failed. Last error: ${lastError}. Please check your API key and available models at https://ai.google.dev/api/rest`);
     }
 
     const data = await response.json();
@@ -70,12 +98,31 @@ async function fetchHotelRating(hotelName) {
   }
 }
 
-function createGeminiPrompt(hotelName) {
-  return `You are a hotel rating assistant. I need you to find Google ratings and recent reviews for the hotel: "${hotelName}".
+function createGeminiPrompt(hotelName, location = null, excludeSources = []) {
+  const sources = [
+    { name: 'Google', alwaysInclude: true },
+    { name: 'Booking.com', alwaysInclude: false },
+    { name: 'Agoda', alwaysInclude: false },
+    { name: 'MakeMyTrip', alwaysInclude: false },
+    { name: 'GoIbibo', alwaysInclude: false }
+  ].filter(source => !excludeSources.includes(source.name.toLowerCase()));
+
+  const sourceList = sources.map(s => s.name).join(', ');
+  
+  // Build location string
+  let locationStr = '';
+  if (location && location.city && location.country) {
+    locationStr = ` located in ${location.city}, ${location.country}`;
+  }
+
+  return `You are a hotel rating assistant. I need you to find ratings and reviews for the hotel: "${hotelName}"${locationStr} from multiple sources: ${sourceList}.
 
 Please provide the information in the following JSON format:
 {
   "hotelName": "exact hotel name as found",
+  "sources": [
+    {
+      "source": "Google",
   "rating": 4.5,
   "totalReviews": 1234,
   "recentReviews": [
@@ -86,16 +133,49 @@ Please provide the information in the following JSON format:
       "text": "Review text here..."
     }
   ]
+    },
+    {
+      "source": "Booking.com",
+      "rating": 4.3,
+      "totalReviews": 856,
+      "recentReviews": [
+        {
+          "author": "Reviewer Name",
+          "rating": 4,
+          "date": "2024-01-20",
+          "text": "Review text here..."
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "pros": [
+      "Positive aspect 1",
+      "Positive aspect 2",
+      "Positive aspect 3"
+    ],
+    "cons": [
+      "Negative aspect 1",
+      "Negative aspect 2"
+    ]
+  }
 }
 
 Instructions:
-1. Search for the exact hotel name "${hotelName}" on Google
-2. Find the Google rating and total number of reviews
-3. Provide the 3 most recent reviews (limit to 3)
-4. If you cannot find the hotel, return rating as 0 and totalReviews as 0
-5. Ensure all review text is properly escaped for JSON
-6. Keep review text concise (max 200 characters per review)
-7. Use realistic dates for recent reviews (within last 6 months)
+1. Search for the exact hotel name "${hotelName}"${locationStr ? ` in ${location.city}, ${location.country}` : ''} on each of these platforms: ${sourceList}
+2. Use the location information (${locationStr ? `${location.city}, ${location.country}` : 'if provided'}) to ensure you find the correct hotel, especially if there are multiple hotels with the same name
+3. For each source, find the rating and total number of reviews
+4. Provide 2-3 most recent reviews per source (limit to 3 per source)
+5. If you cannot find the hotel on a specific source, set rating as 0, totalReviews as 0, and include a message in recentReviews explaining why (e.g., "Hotel not found on this platform" or "No reviews available")
+6. Always include Google ratings if available
+7. Ensure all review text is properly escaped for JSON
+8. Keep review text concise (max 200 characters per review)
+9. Use realistic dates for recent reviews (within last 6 months)
+10. Analyze all reviews from all sources and create a summary:
+   - "pros": List 3-5 most commonly mentioned positive aspects
+   - "cons": List 2-4 most commonly mentioned negative aspects
+11. Base the summary on actual review content, not assumptions
+12. If no reviews are found, set pros and cons as empty arrays
 
 Important: Only return valid JSON, no additional text or explanations.`;
 }
@@ -112,13 +192,28 @@ function parseGeminiResponse(originalHotelName, responseText) {
     const data = JSON.parse(jsonStr);
     
     // Validate the response structure
-    if (!data.hotelName || typeof data.rating !== 'number' || !Array.isArray(data.recentReviews)) {
+    if (!data.hotelName) {
       throw new Error('Invalid response structure from Gemini');
     }
     
-    // Ensure we have the required fields
-    return {
-      hotelName: data.hotelName || originalHotelName,
+    // Parse sources (new format) or convert old format
+    let sources = [];
+    if (data.sources && Array.isArray(data.sources)) {
+      sources = data.sources.map(source => ({
+        source: source.source || 'Unknown',
+        rating: Math.max(0, Math.min(5, source.rating || 0)),
+        totalReviews: Math.max(0, source.totalReviews || 0),
+        recentReviews: (source.recentReviews || []).slice(0, 3).map(review => ({
+          author: review.author || 'Anonymous',
+          rating: Math.max(1, Math.min(5, review.rating || 1)),
+          date: review.date || new Date().toISOString().split('T')[0],
+          text: (review.text || '').substring(0, 200)
+        }))
+      })).filter(s => s.rating > 0); // Only include sources with valid ratings
+    } else {
+      // Fallback: convert old format to new format
+      sources = [{
+        source: 'Google',
       rating: Math.max(0, Math.min(5, data.rating || 0)),
       totalReviews: Math.max(0, data.totalReviews || 0),
       recentReviews: (data.recentReviews || []).slice(0, 3).map(review => ({
@@ -127,6 +222,23 @@ function parseGeminiResponse(originalHotelName, responseText) {
         date: review.date || new Date().toISOString().split('T')[0],
         text: (review.text || '').substring(0, 200)
       }))
+      }].filter(s => s.rating > 0);
+    }
+    
+    // Parse summary
+    const summary = data.summary || {
+      pros: [],
+      cons: []
+    };
+    
+    // Ensure we have the required fields
+    return {
+      hotelName: data.hotelName || originalHotelName,
+      sources: sources,
+      summary: {
+        pros: Array.isArray(summary.pros) ? summary.pros.slice(0, 5) : [],
+        cons: Array.isArray(summary.cons) ? summary.cons.slice(0, 4) : []
+      }
     };
     
   } catch (error) {
@@ -135,14 +247,11 @@ function parseGeminiResponse(originalHotelName, responseText) {
     // Return a fallback response
     return {
       hotelName: originalHotelName,
-      rating: 0,
-      totalReviews: 0,
-      recentReviews: [{
-        author: 'System',
-        rating: 0,
-        date: new Date().toISOString().split('T')[0],
-        text: 'Unable to fetch reviews at this time. Please try again later.'
-      }]
+      sources: [],
+      summary: {
+        pros: [],
+        cons: []
+      }
     };
   }
 }

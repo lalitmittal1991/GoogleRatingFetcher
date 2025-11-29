@@ -2,32 +2,41 @@
 (function() {
   'use strict';
 
-  let isEnabled = false;
-  let currentMode = 'off';
+  // Allowed websites
+  const ALLOWED_SITES = ['booking.com', 'agoda.com', 'makemytrip.com', 'goibibo.com'];
+  
   let isProcessing = false;
-  let lastProcessedHotel = '';
+  let fetchButtons = new Set();
+
+  // Check if current site is allowed
+  function isAllowedSite() {
+    const hostname = window.location.hostname.toLowerCase();
+    return ALLOWED_SITES.some(site => hostname.includes(site));
+  }
 
   // Initialize the content script
   function init() {
-    // Load settings
-    chrome.storage.sync.get(['hotelRatingMode', 'geminiApiKey'], function(result) {
-      currentMode = result.hotelRatingMode || 'off';
+    // Only run on allowed sites
+    if (!isAllowedSite()) {
+      return;
+    }
+
+    // Load settings and initialize
+    chrome.storage.sync.get(['geminiApiKey'], function(result) {
       const apiKey = result.geminiApiKey || '';
       
-      if (currentMode !== 'off' && apiKey) {
+      if (apiKey) {
         enableRatingFetcher();
       } else {
-        disableRatingFetcher();
+        console.log('Hotel Rating Fetcher: API key not configured');
       }
     });
 
-    // Listen for settings changes
+    // Listen for API key changes
     chrome.storage.onChanged.addListener(function(changes, namespace) {
-      if (changes.hotelRatingMode || changes.geminiApiKey) {
-        currentMode = changes.hotelRatingMode?.newValue || currentMode;
+      if (changes.geminiApiKey) {
         const apiKey = changes.geminiApiKey?.newValue || '';
-        
-        if (currentMode !== 'off' && apiKey) {
+        if (apiKey) {
           enableRatingFetcher();
         } else {
           disableRatingFetcher();
@@ -37,64 +46,174 @@
   }
 
   function enableRatingFetcher() {
-    if (isEnabled) return;
+    console.log('Hotel Rating Fetcher enabled');
     
-    isEnabled = true;
-    console.log('Hotel Rating Fetcher enabled with mode:', currentMode);
-
-    if (currentMode === 'continuous') {
-      // Auto-detect hotel names on page load and changes
-      detectAndProcessHotel();
-      
-      // Watch for page changes (for SPAs)
-      const observer = new MutationObserver(function(mutations) {
-        if (!isProcessing) {
-          detectAndProcessHotel();
-        }
-      });
-      
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true
-      });
-    } else if (currentMode === 'onclick') {
-      // Add click listener for manual triggering
-      document.addEventListener('click', handleHotelClick, true);
-    }
+    // Add fetch buttons to listings and detail pages
+    addFetchButtons();
+    
+    // Watch for page changes (for SPAs)
+    const observer = new MutationObserver(function(mutations) {
+      addFetchButtons();
+    });
+    
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
   }
 
   function disableRatingFetcher() {
-    if (!isEnabled) return;
-    
-    isEnabled = false;
     console.log('Hotel Rating Fetcher disabled');
     
-    // Remove existing widgets
+    // Remove existing rating widgets
     const existingWidgets = document.querySelectorAll('.hotel-rating-widget');
     existingWidgets.forEach(widget => widget.remove());
     
-    // Remove event listeners
-    document.removeEventListener('click', handleHotelClick, true);
+    // Remove fetch buttons
+    removeFetchButtons();
   }
-
-  function detectAndProcessHotel() {
-    if (isProcessing || currentMode !== 'continuous') return;
+  
+  function addFetchButtons() {
+    // Add buttons to hotel listings on list pages
+    addButtonsToListings();
     
+    // Add button to hotel detail pages
+    addButtonToDetailPage();
+  }
+  
+  function addButtonsToListings() {
+    // Common selectors for hotel listings on different sites
+    const listingSelectors = {
+      'booking.com': [
+        '[data-testid="property-card"]',
+        '.sr_property_block',
+        '.property-card'
+      ],
+      'agoda.com': [
+        '.PropertyCardItem',
+        '[data-selenium="hotel-item"]',
+        '.hotel-item'
+      ],
+      'makemytrip.com': [
+        '.hotelCard',
+        '.listingCard',
+        '[data-testid="hotel-card"]'
+      ],
+      'goibibo.com': [
+        '.hotelCard',
+        '.hotel-card',
+        '[data-testid="hotel-card"]'
+      ]
+    };
+    
+    const hostname = window.location.hostname.toLowerCase();
+    let selectors = [];
+    
+    for (const [site, siteSelectors] of Object.entries(listingSelectors)) {
+      if (hostname.includes(site)) {
+        selectors = siteSelectors;
+        break;
+      }
+    }
+    
+    selectors.forEach(selector => {
+      const listings = document.querySelectorAll(selector);
+      listings.forEach(listing => {
+        // Check if button already exists
+        if (listing.querySelector('.hotel-fetch-rating-btn')) {
+          return;
+        }
+        
+        // Extract hotel name from listing
+        const hotelName = extractHotelNameFromListing(listing);
+        if (!hotelName) return;
+        
+        // Create fetch button
+        const fetchBtn = createFetchButton(hotelName);
+        listing.appendChild(fetchBtn);
+        fetchButtons.add(fetchBtn);
+      });
+    });
+  }
+  
+  function addButtonToDetailPage() {
+    // Check if we're on a detail page
     const hotelName = extractHotelName();
-    if (hotelName && hotelName !== lastProcessedHotel) {
-      lastProcessedHotel = hotelName;
-      processHotel(hotelName);
+    if (!hotelName) return;
+    
+    // Check if button already exists
+    if (document.querySelector('.hotel-fetch-rating-btn-detail')) {
+      return;
+    }
+    
+    // Common locations for detail page buttons
+    const buttonLocations = [
+      'h1', // Usually near the hotel name
+      '.hotel-header',
+      '.property-header',
+      '[data-testid="hotel-name"]',
+      '.hotel-title'
+    ];
+    
+    for (const selector of buttonLocations) {
+      const element = document.querySelector(selector);
+      if (element) {
+        const fetchBtn = createFetchButton(hotelName, 'detail');
+        // Insert after the element
+        element.parentNode.insertBefore(fetchBtn, element.nextSibling);
+        fetchButtons.add(fetchBtn);
+        break;
+      }
     }
   }
-
-  function handleHotelClick(event) {
-    if (currentMode !== 'onclick' || isProcessing) return;
+  
+  function createFetchButton(hotelName, type = 'listing') {
+    const btn = document.createElement('button');
+    btn.className = `hotel-fetch-rating-btn ${type === 'detail' ? 'hotel-fetch-rating-btn-detail' : ''}`;
+    btn.textContent = 'Fetch Ratings';
+    btn.dataset.hotelName = hotelName;
     
-    // Check if click is on a hotel-related element
-    const hotelName = extractHotelNameFromElement(event.target);
-    if (hotelName) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      e.preventDefault();
       processHotel(hotelName);
+    });
+    
+    return btn;
+  }
+  
+  function removeFetchButtons() {
+    fetchButtons.forEach(btn => {
+      if (btn.parentNode) {
+        btn.parentNode.removeChild(btn);
+      }
+    });
+    fetchButtons.clear();
+  }
+  
+  function extractHotelNameFromListing(listing) {
+    // Try to find hotel name within the listing element
+    const nameSelectors = [
+      'h3',
+      'h2',
+      '.hotel-name',
+      '.property-name',
+      '[data-testid*="name"]',
+      '.title',
+      'a[href*="hotel"]'
+    ];
+    
+    for (const selector of nameSelectors) {
+      const element = listing.querySelector(selector);
+      if (element) {
+        const text = element.textContent?.trim();
+        if (text && isValidHotelName(text)) {
+          return text;
+        }
+      }
     }
+    
+    return null;
   }
 
   function extractHotelName() {
@@ -173,23 +292,173 @@
     return patterns.some(pattern => pattern.test(text));
   }
 
-  function processHotel(hotelName) {
+  function extractLocation() {
+    // Try to extract city and country from the page
+    const locationSelectors = [
+      '[data-testid*="location"]',
+      '[data-testid*="address"]',
+      '.location',
+      '.address',
+      '.city',
+      '.country',
+      '[class*="location"]',
+      '[class*="address"]',
+      '[class*="city"]',
+      '[class*="country"]'
+    ];
+    
+    let city = null;
+    let country = null;
+    
+    // Try to find location elements
+    for (const selector of locationSelectors) {
+      const elements = document.querySelectorAll(selector);
+      for (const el of elements) {
+        const text = el.textContent?.trim().toLowerCase();
+        if (text) {
+          // Try to extract city and country from text
+          const parts = text.split(',').map(p => p.trim());
+          if (parts.length >= 2) {
+            city = parts[0];
+            country = parts[parts.length - 1];
+            break;
+          }
+        }
+      }
+      if (city && country) break;
+    }
+    
+    // Fallback: try to extract from URL or page title
+    if (!city || !country) {
+      const url = window.location.href.toLowerCase();
+      const title = document.title.toLowerCase();
+      
+      // Common patterns
+      const cityPatterns = [
+        /in\s+([a-z\s]+?)(?:,|$)/i,
+        /at\s+([a-z\s]+?)(?:,|$)/i
+      ];
+      
+      const countryPatterns = [
+        /,\s*([a-z\s]+?)(?:-|$)/i
+      ];
+      
+      for (const pattern of cityPatterns) {
+        const match = (url + ' ' + title).match(pattern);
+        if (match && match[1]) {
+          city = match[1].trim();
+          break;
+        }
+      }
+    }
+    
+    return { city, country };
+  }
+  
+  function promptForLocation(hotelName, callback) {
+    // Show a prompt widget to ask for location
+    const promptWidget = createWidget();
+    promptWidget.innerHTML = `
+      <div class="prompt-content">
+        <div class="header">
+          <h3>📍 Location Required</h3>
+          <button class="close-btn">&times;</button>
+        </div>
+        <div class="prompt-body">
+          <p>To find accurate ratings, please provide the location:</p>
+          <div class="location-inputs">
+            <input type="text" id="locationCity" class="location-input" placeholder="City (e.g., Paris)">
+            <input type="text" id="locationCountry" class="location-input" placeholder="Country (e.g., France)">
+          </div>
+          <div class="prompt-buttons">
+            <button class="prompt-btn cancel-btn">Cancel</button>
+            <button class="prompt-btn submit-btn">Fetch Ratings</button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(promptWidget);
+    
+    const closeBtn = promptWidget.querySelector('.close-btn');
+    const cancelBtn = promptWidget.querySelector('.cancel-btn');
+    const submitBtn = promptWidget.querySelector('.submit-btn');
+    const cityInput = promptWidget.querySelector('#locationCity');
+    const countryInput = promptWidget.querySelector('#locationCountry');
+    
+    const close = () => {
+      promptWidget.remove();
+      isProcessing = false;
+    };
+    
+    closeBtn.addEventListener('click', close);
+    cancelBtn.addEventListener('click', close);
+    
+    submitBtn.addEventListener('click', () => {
+      const city = cityInput.value.trim();
+      const country = countryInput.value.trim();
+      
+      if (!city || !country) {
+        alert('Please provide both city and country');
+        return;
+      }
+      
+      promptWidget.remove();
+      callback({ city, country });
+    });
+    
+    // Focus on city input
+    setTimeout(() => cityInput.focus(), 100);
+  }
+
+  function processHotel(hotelName, location = null) {
     if (isProcessing) return;
     
     isProcessing = true;
-    console.log('Processing hotel:', hotelName);
+    console.log('Processing hotel:', hotelName, location);
 
-    // Remove existing widgets
+    // Remove existing rating widgets
     const existingWidgets = document.querySelectorAll('.hotel-rating-widget');
     existingWidgets.forEach(widget => widget.remove());
 
+    // Extract location if not provided
+    if (!location) {
+      location = extractLocation();
+    }
+    
+    // If location is missing, prompt user
+    if (!location.city || !location.country) {
+      isProcessing = false;
+      promptForLocation(hotelName, (providedLocation) => {
+        processHotel(hotelName, providedLocation);
+      });
+      return;
+    }
+    
     // Show loading widget
     showLoadingWidget();
 
-    // Send message to background script
+    // Detect current website and exclude it from sources
+    const currentHost = window.location.hostname.toLowerCase();
+    const excludeSources = [];
+    
+    if (currentHost.includes('booking.com')) {
+      excludeSources.push('booking.com');
+    } else if (currentHost.includes('agoda.com')) {
+      excludeSources.push('agoda');
+    } else if (currentHost.includes('makemytrip.com')) {
+      excludeSources.push('makemytrip');
+    } else if (currentHost.includes('goibibo.com')) {
+      excludeSources.push('goibibo');
+    }
+    // Google is always included, so we don't exclude it
+
+    // Send message to background script with location
     chrome.runtime.sendMessage({
       action: 'fetchHotelRating',
-      hotelName: hotelName
+      hotelName: hotelName,
+      location: location,
+      excludeSources: excludeSources
     }, function(response) {
       isProcessing = false;
       
@@ -200,13 +469,14 @@
       }
     });
   }
+  
 
   function showLoadingWidget() {
     const widget = createWidget();
     widget.innerHTML = `
       <div class="loading-content">
         <div class="spinner"></div>
-        <p>Fetching Google rating...</p>
+        <p>Fetching ratings from multiple sources...</p>
       </div>
     `;
     document.body.appendChild(widget);
@@ -214,22 +484,54 @@
 
   function showRatingWidget(data) {
     const widget = createWidget();
-    widget.innerHTML = `
-      <div class="rating-content">
-        <div class="header">
-          <h3>🏨 ${data.hotelName}</h3>
-          <button class="close-btn">&times;</button>
-        </div>
-        <div class="rating-info">
+    
+    // Build sources tabs/content
+    const sources = data.sources || [];
+    const hasMultipleSources = sources.length > 1;
+    
+    let sourcesHTML = '';
+    let sourcesContentHTML = '';
+    
+    if (sources.length > 0) {
+      sources.forEach((source, index) => {
+        // For single source, always show as active. For multiple, only first is active
+        const isActive = (hasMultipleSources && index === 0) || !hasMultipleSources ? 'active' : '';
+        const sourceIcon = getSourceIcon(source.source);
+        
+        if (hasMultipleSources) {
+          sourcesHTML += `
+            <button class="source-tab ${isActive}" data-source-index="${index}">
+              ${sourceIcon} ${source.source}
+            </button>
+          `;
+        }
+        
+        const hasRating = source.rating > 0 && source.totalReviews > 0;
+        const hasReviews = source.recentReviews && source.recentReviews.length > 0;
+        
+        sourcesContentHTML += `
+          <div class="source-content ${isActive}" data-content-index="${index}">
+          ${hasRating ? `
           <div class="rating-score">
-            <span class="rating-number">${data.rating}</span>
-            <span class="rating-stars">${generateStars(data.rating)}</span>
-            <span class="rating-count">(${data.totalReviews} reviews)</span>
+              <span class="rating-number">${source.rating.toFixed(1)}</span>
+              <span class="rating-stars">${generateStars(source.rating)}</span>
+              <span class="rating-count">(${source.totalReviews.toLocaleString()} reviews)</span>
           </div>
+          ` : `
+          <div class="rating-score no-rating">
+              <p class="no-data-message">⚠️ No ratings found on ${source.source}</p>
+              <p class="no-data-reason">This hotel may not be listed on ${source.source}, or the search criteria didn't match.</p>
+          </div>
+          `}
           <div class="recent-reviews">
             <h4>Recent Reviews:</h4>
             <div class="reviews-list">
-              ${data.recentReviews.map(review => `
+                ${hasReviews ? source.recentReviews.map(review => {
+                  // Check if this is an error message
+                  if (review.text && (review.text.includes('not found') || review.text.includes('No reviews') || review.text.includes('unavailable'))) {
+                    return `<div class="review-item error-message"><p class="review-text">${review.text}</p></div>`;
+                  }
+                  return `
                 <div class="review-item">
                   <div class="review-header">
                     <span class="reviewer-name">${review.author}</span>
@@ -238,9 +540,59 @@
                   </div>
                   <p class="review-text">${review.text}</p>
                 </div>
-              `).join('')}
+                `;
+                }).join('') : '<p class="no-reviews">No recent reviews available for this source.</p>'}
+              </div>
             </div>
           </div>
+        `;
+      });
+    } else {
+      sourcesContentHTML = '<div class="no-sources"><p>No ratings found for this hotel.</p></div>';
+    }
+    
+    // Build summary section
+    const summary = data.summary || { pros: [], cons: [] };
+    let summaryHTML = '';
+    
+    if (summary.pros.length > 0 || summary.cons.length > 0) {
+      summaryHTML = `
+        <div class="summary-section">
+          <h4>📊 Summary from All Sources</h4>
+          ${summary.pros.length > 0 ? `
+            <div class="summary-pros">
+              <h5>✅ Pros:</h5>
+              <ul>
+                ${summary.pros.map(pro => `<li>${pro}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+          ${summary.cons.length > 0 ? `
+            <div class="summary-cons">
+              <h5>❌ Cons:</h5>
+              <ul>
+                ${summary.cons.map(con => `<li>${con}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+    
+    widget.innerHTML = `
+      <div class="rating-content">
+        <div class="header">
+          <h3>🏨 ${data.hotelName}</h3>
+          <button class="close-btn">&times;</button>
+        </div>
+        ${hasMultipleSources ? `
+          <div class="sources-tabs">
+            ${sourcesHTML}
+          </div>
+        ` : ''}
+        <div class="rating-info">
+          ${sourcesContentHTML}
+          ${summaryHTML}
         </div>
       </div>
     `;
@@ -250,7 +602,38 @@
       widget.remove();
     });
     
+    // Add tab switching functionality
+    if (hasMultipleSources) {
+      const tabs = widget.querySelectorAll('.source-tab');
+      const contents = widget.querySelectorAll('.source-content');
+      
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          const index = parseInt(tab.getAttribute('data-source-index'));
+          
+          // Remove active class from all tabs and contents
+          tabs.forEach(t => t.classList.remove('active'));
+          contents.forEach(c => c.classList.remove('active'));
+          
+          // Add active class to clicked tab and corresponding content
+          tab.classList.add('active');
+          contents[index].classList.add('active');
+        });
+      });
+    }
+    
     document.body.appendChild(widget);
+  }
+  
+  function getSourceIcon(sourceName) {
+    const icons = {
+      'Google': '🔍',
+      'Booking.com': '📅',
+      'Agoda': '🏨',
+      'MakeMyTrip': '✈️',
+      'GoIbibo': '✈️'
+    };
+    return icons[sourceName] || '⭐';
   }
 
   function showErrorWidget(error) {
@@ -274,7 +657,7 @@
 
   function createWidget() {
     const widget = document.createElement('div');
-    widget.className = 'hotel-rating-widget';
+    widget.className = 'hotel-rating-widget rating-popup';
     return widget;
   }
 

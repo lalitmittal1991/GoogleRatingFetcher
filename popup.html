@@ -109,6 +109,35 @@
       margin-top: 5px;
       line-height: 1.4;
     }
+    
+    .test-save-btn {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      background: rgba(255, 255, 255, 0.2);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 6px;
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .test-save-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+    
+    .test-save-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .test-save-btn.testing {
+      background: rgba(76, 175, 80, 0.3);
+      border-color: rgba(76, 175, 80, 0.5);
+    }
   </style>
 </head>
 <body>
@@ -118,29 +147,12 @@
   
   <div class="settings-section">
     <div class="setting-group">
-      <label class="setting-label">Mode:</label>
-      <div class="radio-group">
-        <label class="radio-option">
-          <input type="radio" name="mode" value="off">
-          <span>Off - Disabled</span>
-        </label>
-        <label class="radio-option">
-          <input type="radio" name="mode" value="onclick">
-          <span>On Click - Manual trigger</span>
-        </label>
-        <label class="radio-option">
-          <input type="radio" name="mode" value="continuous">
-          <span>Continuous - Auto detect</span>
-        </label>
-      </div>
-    </div>
-    
-    <div class="setting-group">
       <label class="setting-label">Gemini API Key:</label>
       <input type="password" id="apiKey" class="api-key-input" placeholder="Enter your Gemini API key">
       <div class="help-text">
-        Your API key is stored locally and never shared. Get your key from Google AI Studio.
+        Your API key is stored locally and never shared. Get your key from <a href="https://aistudio.google.com/apikey" target="_blank" style="color: rgba(255, 255, 255, 0.9); text-decoration: underline;">Google AI Studio</a>.
       </div>
+      <button id="testAndSaveBtn" class="test-save-btn">Test & Save API Key</button>
     </div>
   </div>
   

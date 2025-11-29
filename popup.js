@@ -1,66 +1,80 @@
 document.addEventListener('DOMContentLoaded', function() {
-  const modeRadios = document.querySelectorAll('input[name="mode"]');
   const apiKeyInput = document.getElementById('apiKey');
   const statusDiv = document.getElementById('status');
+  const testAndSaveBtn = document.getElementById('testAndSaveBtn');
 
   // Load saved settings
   loadSettings();
 
-  // Add event listeners
-  modeRadios.forEach(radio => {
-    radio.addEventListener('change', saveSettings);
-  });
-
-  apiKeyInput.addEventListener('input', saveSettings);
+  // Add event listener for test and save button
+  testAndSaveBtn.addEventListener('click', testAndSaveApiKey);
 
   function loadSettings() {
-    chrome.storage.sync.get(['hotelRatingMode', 'geminiApiKey'], function(result) {
-      const mode = result.hotelRatingMode || 'off';
+    chrome.storage.sync.get(['geminiApiKey'], function(result) {
       const apiKey = result.geminiApiKey || '';
       
-      // Set radio button
-      document.querySelector(`input[name="mode"][value="${mode}"]`).checked = true;
-      
-      // Set API key
-      apiKeyInput.value = apiKey;
-      
-      // Show status if API key is missing
-      if (!apiKey && mode !== 'off') {
-        showStatus('Please enter your Gemini API key to use this extension', 'error');
+      // Set API key if it exists
+      if (apiKey) {
+        apiKeyInput.value = apiKey;
+        showStatus('API key loaded. Click "Test & Save" to verify it still works.', 'success');
       }
     });
   }
 
-  function saveSettings() {
-    const selectedMode = document.querySelector('input[name="mode"]:checked').value;
+  async function testAndSaveApiKey() {
     const apiKey = apiKeyInput.value.trim();
+    
+    if (!apiKey) {
+      showStatus('Please enter your Gemini API key', 'error');
+      return;
+    }
 
-    chrome.storage.sync.set({
-      hotelRatingMode: selectedMode,
-      geminiApiKey: apiKey
-    }, function() {
-      if (selectedMode === 'off') {
-        showStatus('Extension disabled', 'success');
-        // Disable content script
-        chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-          chrome.scripting.executeScript({
-            target: {tabId: tabs[0].id},
-            function: disableRatingFetcher
-          });
-        });
-      } else if (apiKey) {
-        showStatus('Settings saved successfully', 'success');
-        // Enable content script
-        chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-          chrome.scripting.executeScript({
-            target: {tabId: tabs[0].id},
-            function: enableRatingFetcher
-          });
-        });
-      } else {
-        showStatus('Please enter your Gemini API key', 'error');
+    // Disable button and show testing state
+    testAndSaveBtn.disabled = true;
+    testAndSaveBtn.textContent = 'Testing...';
+    testAndSaveBtn.classList.add('testing');
+    showStatus('Testing API key...', 'success');
+
+    try {
+      // Test the API key with a simple request
+      const testResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: 'Say "OK" if you can read this.'
+            }]
+          }],
+          generationConfig: {
+            maxOutputTokens: 10,
+          }
+        })
+      });
+
+      if (!testResponse.ok) {
+        const errorData = await testResponse.json();
+        throw new Error(errorData.error?.message || 'API key validation failed');
       }
-    });
+
+      // API key is valid, save it
+      chrome.storage.sync.set({
+        geminiApiKey: apiKey
+      }, function() {
+        showStatus('✅ API key validated and saved successfully!', 'success');
+        testAndSaveBtn.textContent = 'Test & Save API Key';
+        testAndSaveBtn.classList.remove('testing');
+        testAndSaveBtn.disabled = false;
+      });
+
+    } catch (error) {
+      showStatus(`❌ API key test failed: ${error.message}`, 'error');
+      testAndSaveBtn.textContent = 'Test & Save API Key';
+      testAndSaveBtn.classList.remove('testing');
+      testAndSaveBtn.disabled = false;
+    }
   }
 
   function showStatus(message, type) {
@@ -68,23 +82,10 @@ document.addEventListener('DOMContentLoaded', function() {
     statusDiv.className = `status ${type}`;
     statusDiv.style.display = 'block';
     
+    // Keep success messages longer, error messages shorter
+    const timeout = type === 'success' ? 5000 : 4000;
     setTimeout(() => {
       statusDiv.style.display = 'none';
-    }, 3000);
+    }, timeout);
   }
 });
-
-// Functions to be injected into content script
-function disableRatingFetcher() {
-  // Remove any existing rating widgets
-  const existingWidgets = document.querySelectorAll('.hotel-rating-widget');
-  existingWidgets.forEach(widget => widget.remove());
-  
-  // Remove click listeners
-  document.removeEventListener('click', handleHotelClick);
-}
-
-function enableRatingFetcher() {
-  // This will be handled by the content script
-  console.log('Hotel Rating Fetcher enabled');
-}

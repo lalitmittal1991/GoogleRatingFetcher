@@ -1,10 +1,6 @@
 /* Hotel Rating Widget Styles */
 .hotel-rating-widget {
   position: fixed;
-  top: 20px;
-  right: 20px;
-  width: 400px;
-  max-width: 90vw;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 15px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
@@ -14,7 +10,21 @@
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
   animation: slideIn 0.3s ease-out;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
+
+/* Popup Widget (for detailed ratings) */
+.hotel-rating-widget.rating-popup {
+  top: 20px;
+  right: 20px;
+  width: 450px;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+/* Sidebar removed - keeping only right popup widget */
 
 @keyframes slideIn {
   from {
@@ -66,6 +76,8 @@
 
 .hotel-rating-widget .rating-content {
   padding: 20px;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .hotel-rating-widget .rating-info {
@@ -116,7 +128,7 @@
   display: flex;
   flex-direction: column;
   gap: 15px;
-  max-height: 300px;
+  max-height: 250px;
   overflow-y: auto;
 }
 
@@ -240,4 +252,436 @@
 
 .hotel-rating-widget .reviews-list::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.5);
+}
+
+/* Main widget scrollbar */
+.hotel-rating-widget::-webkit-scrollbar {
+  width: 8px;
+}
+
+.hotel-rating-widget::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.hotel-rating-widget::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+}
+
+.hotel-rating-widget::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Sidebar Specific Styles */
+.sidebar-content {
+  padding: 20px;
+}
+
+.sidebar-header {
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.sidebar-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: white;
+}
+
+.sidebar-mode {
+  margin-bottom: 20px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.mode-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 5px;
+}
+
+.mode-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+}
+
+.sidebar-summary-section {
+  margin-bottom: 20px;
+  min-height: 150px;
+}
+
+.summary-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 10px;
+}
+
+.summary-content {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.summary-content .loading-text,
+.summary-content .no-summary {
+  color: rgba(255, 255, 255, 0.7);
+  font-style: italic;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.sidebar-pros,
+.sidebar-cons {
+  margin-bottom: 15px;
+}
+
+.sidebar-pros strong {
+  color: #4CAF50;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.sidebar-cons strong {
+  color: #f44336;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.sidebar-pros ul,
+.sidebar-cons ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style: none;
+}
+
+.sidebar-pros ul li,
+.sidebar-cons ul li {
+  margin-bottom: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.9);
+  position: relative;
+  padding-left: 15px;
+}
+
+.sidebar-pros ul li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: #4CAF50;
+  font-weight: bold;
+}
+
+.sidebar-cons ul li::before {
+  content: "✗";
+  position: absolute;
+  left: 0;
+  color: #f44336;
+  font-weight: bold;
+}
+
+.fetch-btn {
+  width: 100%;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.fetch-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.fetch-btn:active {
+  transform: scale(0.98);
+}
+
+.fetch-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Fetch Rating Buttons on Listings and Detail Pages */
+.hotel-fetch-rating-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  margin: 8px 0;
+  display: inline-block;
+  z-index: 1000;
+  position: relative;
+}
+
+.hotel-fetch-rating-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.hotel-fetch-rating-btn:active {
+  transform: translateY(0);
+}
+
+.hotel-fetch-rating-btn-detail {
+  padding: 12px 24px;
+  font-size: 14px;
+  margin: 12px 0;
+}
+
+/* Prompt Widget Styles */
+.hotel-rating-widget .prompt-content {
+  padding: 20px;
+}
+
+.hotel-rating-widget .prompt-body {
+  margin-top: 15px;
+}
+
+.hotel-rating-widget .prompt-body p {
+  margin: 0 0 15px 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.5;
+}
+
+.hotel-rating-widget .location-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.hotel-rating-widget .location-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.hotel-rating-widget .location-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.hotel-rating-widget .location-input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.hotel-rating-widget .prompt-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.hotel-rating-widget .prompt-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.hotel-rating-widget .prompt-btn.cancel-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.hotel-rating-widget .prompt-btn.cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.hotel-rating-widget .prompt-btn.submit-btn {
+  background: rgba(76, 175, 80, 0.8);
+  color: white;
+}
+
+.hotel-rating-widget .prompt-btn.submit-btn:hover {
+  background: rgba(76, 175, 80, 1);
+}
+
+/* No Rating/Data Messages */
+.hotel-rating-widget .no-rating {
+  text-align: center;
+  padding: 20px;
+}
+
+.hotel-rating-widget .no-data-message {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 8px;
+}
+
+.hotel-rating-widget .no-data-reason {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  font-style: italic;
+}
+
+.hotel-rating-widget .review-item.error-message {
+  background: rgba(244, 67, 54, 0.2);
+  border: 1px solid rgba(244, 67, 54, 0.4);
+}
+
+.hotel-rating-widget .review-item.error-message .review-text {
+  color: rgba(255, 255, 255, 0.9);
+  font-style: italic;
+}
+
+/* Sources Tabs Styles */
+.hotel-rating-widget .sources-tabs {
+  display: flex;
+  gap: 5px;
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  overflow-x: auto;
+}
+
+.hotel-rating-widget .source-tab {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.7);
+  padding: 8px 15px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.hotel-rating-widget .source-tab:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+}
+
+.hotel-rating-widget .source-tab.active {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: white;
+  font-weight: 600;
+}
+
+/* Source Content Styles */
+.hotel-rating-widget .source-content {
+  display: none;
+}
+
+.hotel-rating-widget .source-content.active {
+  display: block;
+}
+
+/* When there are no tabs (single source), always show the content */
+.hotel-rating-widget .rating-info > .source-content:first-child:last-child {
+  display: block;
+}
+
+.hotel-rating-widget .no-reviews,
+.hotel-rating-widget .no-sources {
+  text-align: center;
+  padding: 20px;
+  color: rgba(255, 255, 255, 0.7);
+  font-style: italic;
+}
+
+/* Summary Section Styles */
+.hotel-rating-widget .summary-section {
+  margin-top: 25px;
+  padding-top: 25px;
+  border-top: 2px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 20px;
+  border-radius: 10px;
+}
+
+.hotel-rating-widget .summary-section h4 {
+  margin: 0 0 15px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+}
+
+.hotel-rating-widget .summary-section h5 {
+  margin: 15px 0 10px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+}
+
+.hotel-rating-widget .summary-section h5:first-child {
+  margin-top: 0;
+}
+
+.hotel-rating-widget .summary-pros {
+  margin-bottom: 15px;
+}
+
+.hotel-rating-widget .summary-pros h5 {
+  color: #4CAF50;
+}
+
+.hotel-rating-widget .summary-cons h5 {
+  color: #f44336;
+}
+
+.hotel-rating-widget .summary-section ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style: none;
+}
+
+.hotel-rating-widget .summary-section ul li {
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.9);
+  position: relative;
+  padding-left: 20px;
+}
+
+.hotel-rating-widget .summary-pros ul li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: #4CAF50;
+  font-weight: bold;
+}
+
+.hotel-rating-widget .summary-cons ul li::before {
+  content: "✗";
+  position: absolute;
+  left: 0;
+  color: #f44336;
+  font-weight: bold;
 }
