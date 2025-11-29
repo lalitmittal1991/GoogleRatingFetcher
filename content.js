@@ -50,6 +50,8 @@
     
     // Add fetch buttons to listings and detail pages
     addFetchButtons();
+    // Add a floating manual-fetch button to handle cases where listing buttons do not appear
+    addFloatingSearchButton();
     
     // Watch for page changes (for SPAs)
     const observer = new MutationObserver(function(mutations) {
@@ -476,7 +478,7 @@
     widget.innerHTML = `
       <div class="loading-content">
         <div class="spinner"></div>
-        <p>Fetching ratings from multiple sources...</p>
+        <p>Fetching Google ratings...</p>
       </div>
     `;
     document.body.appendChild(widget);
@@ -485,68 +487,53 @@
   function showRatingWidget(data) {
     const widget = createWidget();
     
-    // Build sources tabs/content
+    // Get Google source (should be the only source now)
     const sources = data.sources || [];
-    const hasMultipleSources = sources.length > 1;
+    const googleReviewsLink = data.googleMapsUrl || data.googleReviewsLink || `https://www.google.com/search?q=${encodeURIComponent(data.hotelName)}+hotels+reviews`;
     
-    let sourcesHTML = '';
-    let sourcesContentHTML = '';
+    let ratingContent = '';
     
     if (sources.length > 0) {
-      sources.forEach((source, index) => {
-        // For single source, always show as active. For multiple, only first is active
-        const isActive = (hasMultipleSources && index === 0) || !hasMultipleSources ? 'active' : '';
-        const sourceIcon = getSourceIcon(source.source);
-        
-        if (hasMultipleSources) {
-          sourcesHTML += `
-            <button class="source-tab ${isActive}" data-source-index="${index}">
-              ${sourceIcon} ${source.source}
-            </button>
-          `;
-        }
-        
-        const hasRating = source.rating > 0 && source.totalReviews > 0;
-        const hasReviews = source.recentReviews && source.recentReviews.length > 0;
-        
-        sourcesContentHTML += `
-          <div class="source-content ${isActive}" data-content-index="${index}">
-          ${hasRating ? `
-          <div class="rating-score">
-              <span class="rating-number">${source.rating.toFixed(1)}</span>
-              <span class="rating-stars">${generateStars(source.rating)}</span>
-              <span class="rating-count">(${source.totalReviews.toLocaleString()} reviews)</span>
-          </div>
-          ` : `
-          <div class="rating-score no-rating">
-              <p class="no-data-message">⚠️ No ratings found on ${source.source}</p>
-              <p class="no-data-reason">This hotel may not be listed on ${source.source}, or the search criteria didn't match.</p>
-          </div>
-          `}
-          <div class="recent-reviews">
-            <h4>Recent Reviews:</h4>
-            <div class="reviews-list">
-                ${hasReviews ? source.recentReviews.map(review => {
-                  // Check if this is an error message
-                  if (review.text && (review.text.includes('not found') || review.text.includes('No reviews') || review.text.includes('unavailable'))) {
-                    return `<div class="review-item error-message"><p class="review-text">${review.text}</p></div>`;
-                  }
-                  return `
-                <div class="review-item">
-                  <div class="review-header">
-                    <span class="reviewer-name">${review.author}</span>
-                    <span class="review-rating">${generateStars(review.rating)}</span>
-                    <span class="review-date">${review.date}</span>
-                  </div>
-                  <p class="review-text">${review.text}</p>
+      const source = sources[0]; // Only Google source
+      const hasRating = source.rating > 0 && source.totalReviews > 0;
+      const hasReviews = source.recentReviews && source.recentReviews.length > 0;
+      
+      ratingContent = `
+        ${hasRating ? `
+        <div class="rating-score">
+            <span class="rating-number">${source.rating.toFixed(1)}</span>
+            <span class="rating-stars">${generateStars(source.rating)}</span>
+            <span class="rating-count">(${source.totalReviews.toLocaleString()} reviews)</span>
+        </div>
+        ` : `
+        <div class="rating-score no-rating">
+            <p class="no-data-message">⚠️ No ratings found on Google</p>
+            <p class="no-data-reason">This hotel may not be listed on Google, or the search criteria didn't match.</p>
+        </div>
+        `}
+        <div class="recent-reviews">
+          <h4>Recent Reviews:</h4>
+          <div class="reviews-list">
+              ${hasReviews ? source.recentReviews.map(review => {
+                // Check if this is an error message
+                if (review.text && (review.text.includes('not found') || review.text.includes('No reviews') || review.text.includes('unavailable'))) {
+                  return `<div class="review-item error-message"><p class="review-text">${review.text}</p></div>`;
+                }
+                return `
+              <div class="review-item">
+                <div class="review-header">
+                  <span class="reviewer-name">${review.author}</span>
+                  <span class="review-rating">${generateStars(review.rating)}</span>
+                  <span class="review-date">${review.date}</span>
                 </div>
-                `;
-                }).join('') : '<p class="no-reviews">No recent reviews available for this source.</p>'}
+                <p class="review-text">${review.text}</p>
               </div>
+              `;
+              }).join('') : '<p class="no-reviews">No recent reviews available on Google.</p>'}
             </div>
           </div>
-        `;
-      });
+        </div>
+      `;
     } else {
       sourcesContentHTML = '<div class="no-sources"><p>No ratings found for this hotel.</p></div>';
     }
@@ -558,7 +545,7 @@
     if (summary.pros.length > 0 || summary.cons.length > 0) {
       summaryHTML = `
         <div class="summary-section">
-          <h4>📊 Summary from All Sources</h4>
+          <h4>📊 Summary from Google</h4>
           ${summary.pros.length > 0 ? `
             <div class="summary-pros">
               <h5>✅ Pros:</h5>
@@ -575,6 +562,21 @@
               </ul>
             </div>
           ` : ''}
+          <div class="google-reviews-link">
+            <a href="${googleReviewsLink}" target="_blank" rel="noopener noreferrer" class="reviews-button">
+              🔗 View All Google Reviews
+            </a>
+          </div>
+        </div>
+      `;
+    } else {
+      summaryHTML = `
+        <div class="summary-section">
+          <div class="google-reviews-link">
+            <a href="${googleReviewsLink}" target="_blank" rel="noopener noreferrer" class="reviews-button">
+              🔗 View All Google Reviews
+            </a>
+          </div>
         </div>
       `;
     }
@@ -585,13 +587,8 @@
           <h3>🏨 ${data.hotelName}</h3>
           <button class="close-btn">&times;</button>
         </div>
-        ${hasMultipleSources ? `
-          <div class="sources-tabs">
-            ${sourcesHTML}
-          </div>
-        ` : ''}
         <div class="rating-info">
-          ${sourcesContentHTML}
+          ${ratingContent}
           ${summaryHTML}
         </div>
       </div>
@@ -602,38 +599,131 @@
       widget.remove();
     });
     
-    // Add tab switching functionality
-    if (hasMultipleSources) {
-      const tabs = widget.querySelectorAll('.source-tab');
-      const contents = widget.querySelectorAll('.source-content');
-      
-      tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-          const index = parseInt(tab.getAttribute('data-source-index'));
-          
-          // Remove active class from all tabs and contents
-          tabs.forEach(t => t.classList.remove('active'));
-          contents.forEach(c => c.classList.remove('active'));
-          
-          // Add active class to clicked tab and corresponding content
-          tab.classList.add('active');
-          contents[index].classList.add('active');
-        });
-      });
-    }
-    
     document.body.appendChild(widget);
   }
   
   function getSourceIcon(sourceName) {
     const icons = {
       'Google': '🔍',
+      'Google Listing': '📍',
       'Booking.com': '📅',
       'Agoda': '🏨',
       'MakeMyTrip': '✈️',
       'GoIbibo': '✈️'
     };
     return icons[sourceName] || '⭐';
+  }
+
+  // Floating manual fetch button and manual-input widget
+  function addFloatingSearchButton() {
+    // Avoid adding multiple buttons
+    if (document.querySelector('.hotel-floating-button')) return;
+
+    const btn = document.createElement('button');
+    btn.className = 'hotel-floating-button';
+    btn.title = 'Manual fetch hotel rating';
+    btn.textContent = 'Fetch Rating';
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      showManualInputWidget();
+    });
+
+    document.body.appendChild(btn);
+  }
+
+  function showManualInputWidget() {
+    // Create widget similar to promptForLocation but includes hotel name
+    const widget = createWidget();
+    const lastLocation = loadLastLocationFromSession();
+    const prefill = extractLocation();
+
+    const cityPrefill = lastLocation?.city || prefill.city || '';
+    const countryPrefill = lastLocation?.country || prefill.country || '';
+
+    widget.innerHTML = `
+      <div class="prompt-content">
+        <div class="header">
+          <h3>🔎 Manual Fetch</h3>
+          <button class="close-btn">&times;</button>
+        </div>
+        <div class="prompt-body">
+          <p>Enter hotel details to fetch Google listing rating:</p>
+          <div class="location-inputs">
+            <input type="text" id="manualHotelName" class="location-input" placeholder="Hotel name (required)">
+            <input type="text" id="manualCity" class="location-input" placeholder="City (e.g., Paris)" value="${cityPrefill}">
+            <input type="text" id="manualCountry" class="location-input" placeholder="Country (e.g., France)" value="${countryPrefill}">
+          </div>
+          <div class="prompt-buttons">
+            <button class="prompt-btn cancel-btn">Cancel</button>
+            <button class="prompt-btn submit-btn">Fetch</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(widget);
+
+    const closeBtn = widget.querySelector('.close-btn');
+    const cancelBtn = widget.querySelector('.cancel-btn');
+    const submitBtn = widget.querySelector('.submit-btn');
+    const hotelInput = widget.querySelector('#manualHotelName');
+    const cityInput = widget.querySelector('#manualCity');
+    const countryInput = widget.querySelector('#manualCountry');
+
+    const close = () => widget.remove();
+    closeBtn.addEventListener('click', close);
+    cancelBtn.addEventListener('click', close);
+
+    // If user has selected text on the page, prefill hotel name with that selection
+    try {
+      const sel = (window.getSelection && window.getSelection().toString && window.getSelection().toString().trim()) || '';
+      if (sel) {
+        hotelInput.value = sel;
+      }
+    } catch (e) {
+      // ignore selection errors
+    }
+
+    submitBtn.addEventListener('click', () => {
+      const hotelName = hotelInput.value.trim();
+      const city = cityInput.value.trim();
+      const country = countryInput.value.trim();
+
+      if (!hotelName) {
+        alert('Please enter hotel name');
+        return;
+      }
+
+      // Save last-entered location to sessionStorage so it persists while the tab is open
+      if (city || country) {
+        saveLastLocationToSession({ city, country });
+      }
+
+      close();
+      processHotel(hotelName, { city, country });
+    });
+
+    // Focus hotel input
+    setTimeout(() => hotelInput.focus(), 100);
+  }
+
+  function loadLastLocationFromSession() {
+    try {
+      const raw = sessionStorage.getItem('hotelRatingLastLocation');
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveLastLocationToSession(location) {
+    try {
+      sessionStorage.setItem('hotelRatingLastLocation', JSON.stringify(location));
+    } catch (e) {
+      // ignore
+    }
   }
 
   function showErrorWidget(error) {

@@ -685,3 +685,62 @@
   color: #f44336;
   font-weight: bold;
 }
+
+/* Google Reviews Link Section */
+.hotel-rating-widget .google-reviews-link {
+  margin-top: 15px;
+  text-align: center;
+  padding-top: 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.hotel-rating-widget .reviews-button {
+  display: inline-block;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+  cursor: pointer;
+  border: none;
+}
+
+.hotel-rating-widget .reviews-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(76, 175, 80, 0.5);
+}
+
+.hotel-rating-widget .reviews-button:active {
+  transform: translateY(0);
+}
+
+/* Floating manual fetch button */
+.hotel-floating-button {
+  position: fixed;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10001;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ff4757 100%);
+  color: white;
+  border: none;
+  padding: 12px 14px;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.hotel-floating-button:hover {
+  transform: translateY(-50%) translateY(-3px);
+  box-shadow: 0 10px 26px rgba(0,0,0,0.3);
+}
+
+.hotel-floating-button:active {
+  transform: translateY(-50%);
+}

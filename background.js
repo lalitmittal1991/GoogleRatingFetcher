@@ -1,15 +1,17 @@
 // Hotel Rating Fetcher Background Script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'fetchHotelRating') {
-    fetchHotelRating(request.hotelName, request.location, request.excludeSources || [])
-      .then(data => {
+    (async () => {
+      try {
+        console.log('Background: fetchHotelRating request received for', request.hotelName, request.location);
+        const data = await fetchHotelRating(request.hotelName, request.location, request.excludeSources || []);
         sendResponse({ success: true, data });
-      })
-      .catch(error => {
+      } catch (error) {
         console.error('Error fetching hotel rating:', error);
-        sendResponse({ success: false, error: error.message });
-      });
-    
+        sendResponse({ success: false, error: error?.message || String(error) });
+      }
+    })();
+
     // Return true to indicate we will send a response asynchronously
     return true;
   }
@@ -18,8 +20,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 async function fetchHotelRating(hotelName, location = null, excludeSources = []) {
   try {
     // Get API key from storage
-    const result = await chrome.storage.sync.get(['geminiApiKey']);
-    const apiKey = result.geminiApiKey;
+    const getSync = (keys) => new Promise((resolve) => chrome.storage.sync.get(keys, resolve));
+    const result = await getSync(['geminiApiKey']);
+    const apiKey = result?.geminiApiKey;
+    console.log('Background: geminiApiKey loaded?', !!apiKey);
     
     if (!apiKey || apiKey.trim() === '') {
       throw new Error('Gemini API key not configured. Please open the extension popup and enter your API key in the settings.');
@@ -27,6 +31,7 @@ async function fetchHotelRating(hotelName, location = null, excludeSources = [])
 
     // Create the prompt for Gemini
     const prompt = createGeminiPrompt(hotelName, location, excludeSources);
+    console.log('Background: prompt built, length=', prompt.length);
     
     // Call Gemini API - try different models/versions
     // Using gemini-2.0-flash as primary (known to work)
@@ -43,6 +48,7 @@ async function fetchHotelRating(hotelName, location = null, excludeSources = [])
     for (const { version, model } of modelsToTry) {
       try {
         const url = `https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent?key=${apiKey}`;
+        console.log('Background: calling Gemini model', model, version);
         response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -67,8 +73,9 @@ async function fetchHotelRating(hotelName, location = null, excludeSources = [])
           console.log(`Successfully using model: ${model} (${version})`);
           break; // Success, exit loop
         } else {
-      const errorData = await response.json();
-          lastError = errorData.error?.message || 'Unknown error';
+          let errorData = null;
+          try { errorData = await response.json(); } catch (e) { /* ignore */ }
+          lastError = errorData?.error?.message || `HTTP ${response.status}`;
           console.log(`Model ${model} (${version}) failed: ${lastError}`);
         }
       } catch (error) {
@@ -84,6 +91,7 @@ async function fetchHotelRating(hotelName, location = null, excludeSources = [])
 
     const data = await response.json();
     const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    console.log('Background: received generatedText length=', generatedText?.length || 0);
     
     if (!generatedText) {
       throw new Error('No response from Gemini API');
@@ -99,50 +107,34 @@ async function fetchHotelRating(hotelName, location = null, excludeSources = [])
 }
 
 function createGeminiPrompt(hotelName, location = null, excludeSources = []) {
+  // Prefer Google Maps / Business Profile (Google Listing) rating
   const sources = [
-    { name: 'Google', alwaysInclude: true },
-    { name: 'Booking.com', alwaysInclude: false },
-    { name: 'Agoda', alwaysInclude: false },
-    { name: 'MakeMyTrip', alwaysInclude: false },
-    { name: 'GoIbibo', alwaysInclude: false }
-  ].filter(source => !excludeSources.includes(source.name.toLowerCase()));
+    { name: 'Google Listing', alwaysInclude: true }
+  ];
 
-  const sourceList = sources.map(s => s.name).join(', ');
-  
   // Build location string
   let locationStr = '';
   if (location && location.city && location.country) {
     locationStr = ` located in ${location.city}, ${location.country}`;
   }
 
-  return `You are a hotel rating assistant. I need you to find ratings and reviews for the hotel: "${hotelName}"${locationStr} from multiple sources: ${sourceList}.
+  return `You are a hotel rating assistant. I need you to find the official Google listing (Google Maps / Business Profile) rating and recent reviews for the hotel: "${hotelName}"${locationStr}. Prefer the Google Maps listing rating (the one shown on Google Maps/Business Profile) over other Google search snippets.
 
 Please provide the information in the following JSON format:
 {
   "hotelName": "exact hotel name as found",
+  "googleMapsUrl": "https://www.google.com/maps/place/...",
+  "googleReviewsLink": "https://www.google.com/search?q=${encodeURIComponent(hotelName)}+hotels+reviews",
   "sources": [
     {
-      "source": "Google",
-  "rating": 4.5,
-  "totalReviews": 1234,
-  "recentReviews": [
-    {
-      "author": "Reviewer Name",
-      "rating": 5,
-      "date": "2024-01-15",
-      "text": "Review text here..."
-    }
-  ]
-    },
-    {
-      "source": "Booking.com",
-      "rating": 4.3,
-      "totalReviews": 856,
+      "source": "Google Listing",
+      "rating": 4.5,
+      "totalReviews": 1234,
       "recentReviews": [
         {
           "author": "Reviewer Name",
-          "rating": 4,
-          "date": "2024-01-20",
+          "rating": 5,
+          "date": "2024-01-15",
           "text": "Review text here..."
         }
       ]
@@ -162,20 +154,20 @@ Please provide the information in the following JSON format:
 }
 
 Instructions:
-1. Search for the exact hotel name "${hotelName}"${locationStr ? ` in ${location.city}, ${location.country}` : ''} on each of these platforms: ${sourceList}
-2. Use the location information (${locationStr ? `${location.city}, ${location.country}` : 'if provided'}) to ensure you find the correct hotel, especially if there are multiple hotels with the same name
-3. For each source, find the rating and total number of reviews
-4. Provide 2-3 most recent reviews per source (limit to 3 per source)
-5. If you cannot find the hotel on a specific source, set rating as 0, totalReviews as 0, and include a message in recentReviews explaining why (e.g., "Hotel not found on this platform" or "No reviews available")
-6. Always include Google ratings if available
-7. Ensure all review text is properly escaped for JSON
-8. Keep review text concise (max 200 characters per review)
-9. Use realistic dates for recent reviews (within last 6 months)
-10. Analyze all reviews from all sources and create a summary:
+1. Search for the exact hotel name "${hotelName}"${locationStr ? ` in ${location.city}, ${location.country}` : ''} on Google Maps / Google Business Profile.
+2. Use the location information (${locationStr ? `${location.city}, ${location.country}` : 'if provided'}) to ensure you find the correct hotel, especially if there are multiple hotels with the same name.
+3. Find the official Google Maps listing rating and total number of reviews (prefer this value).
+4. Provide 2-3 most recent reviews from the Google Maps listing (limit to 3).
+5. If you cannot find the hotel on Google Maps, set rating as 0, totalReviews as 0, and include a message in recentReviews explaining why.
+6. Always provide `googleMapsUrl` (direct Google Maps listing URL) if available, and also include `googleReviewsLink` (a Google search URL for reviews) as a fallback.
+7. Ensure all review text is properly escaped for JSON.
+8. Keep review text concise (max 200 characters per review).
+9. Use realistic dates for recent reviews (within last 6 months).
+10. Create a summary based on Google reviews:
    - "pros": List 3-5 most commonly mentioned positive aspects
    - "cons": List 2-4 most commonly mentioned negative aspects
-11. Base the summary on actual review content, not assumptions
-12. If no reviews are found, set pros and cons as empty arrays
+11. Base the summary on actual review content, not assumptions.
+12. If no reviews are found, set pros and cons as empty arrays.
 
 Important: Only return valid JSON, no additional text or explanations.`;
 }
@@ -234,6 +226,8 @@ function parseGeminiResponse(originalHotelName, responseText) {
     // Ensure we have the required fields
     return {
       hotelName: data.hotelName || originalHotelName,
+      googleMapsUrl: data.googleMapsUrl || null,
+      googleReviewsLink: data.googleReviewsLink || `https://www.google.com/search?q=${encodeURIComponent(originalHotelName)}+hotels+reviews`,
       sources: sources,
       summary: {
         pros: Array.isArray(summary.pros) ? summary.pros.slice(0, 5) : [],
@@ -247,6 +241,8 @@ function parseGeminiResponse(originalHotelName, responseText) {
     // Return a fallback response
     return {
       hotelName: originalHotelName,
+      googleMapsUrl: null,
+      googleReviewsLink: `https://www.google.com/search?q=${encodeURIComponent(originalHotelName)}+hotels+reviews`,
       sources: [],
       summary: {
         pros: [],
